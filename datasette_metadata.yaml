@@ -1,0 +1,267 @@
+# Datasette Metadata Configuration for LDA Transparency Database
+
+title: LDA Transparency Database
+description: |
+  A searchable database of Lahore Development Authority (LDA) planning meetings,
+  decisions, regulations, and documents. Built to support advocacy for walkable
+  Lahore and sustainable urban development.
+
+license: CC0-1.0
+license_url: https://creativecommons.org/publicdomain/zero/1.0/
+
+source: Lahore Development Authority
+source_url: https://lda.gop.pk
+
+about: lda_transparency/about
+about_url: https://github.com/yourusername/lda_scraper
+
+databases:
+  lda_transparency:
+    title: LDA Transparency Database
+    description: Documents, meetings, and regulations from the Lahore Development Authority
+
+    tables:
+      documents:
+        title: Documents
+        description: All LDA documents including regulations, meeting minutes, and more
+        label_column: title
+        sort_desc: date_published
+
+        columns:
+          id: Document ID
+          document_type: Type
+          title: Title
+          url: Source URL
+          file_path: Local File
+          date_published: Published Date
+          date_scraped: Scraped Date
+          page_count: Pages
+          file_size: File Size (bytes)
+          is_scanned: Scanned PDF
+          extraction_method: Extraction Method
+          source_page: Source Page
+          metadata: Additional Metadata
+
+        facets:
+          - document_type
+          - is_scanned
+          - extraction_method
+
+      document_content:
+        title: Document Content
+        description: Full text content extracted from documents
+        hidden: false
+
+        columns:
+          id: Content ID
+          document_id: Document
+          page_number: Page
+          content: Text Content
+          language: Language
+          ocr_confidence: OCR Confidence
+
+      tags:
+        title: Advocacy Topics
+        description: Auto-tagged advocacy topics (walkability, transport, density, etc.)
+        label_column: name
+
+        columns:
+          id: Tag ID
+          name: Topic Name
+          category: Category
+          description: Description
+
+        facets:
+          - category
+
+      document_tags:
+        title: Document Tags
+        description: Association between documents and advocacy topics
+        hidden: false
+
+        columns:
+          document_id: Document
+          tag_id: Tag
+          confidence: Confidence
+
+      meeting_minutes:
+        title: Meeting Minutes
+        description: LDA authority meeting minutes (typically scanned PDFs)
+        label_column: document_id
+        sort_desc: meeting_date
+
+        columns:
+          id: Record ID
+          document_id: Document
+          meeting_date: Meeting Date
+          meeting_type: Type
+          attendees: Attendees
+          agenda_items: Agenda
+          decisions: Decisions
+
+        facets:
+          - meeting_type
+
+      regulations:
+        title: Regulations
+        description: Building regulations and bylaws
+        label_column: document_id
+        sort_desc: effective_date
+
+        columns:
+          id: Record ID
+          document_id: Document
+          regulation_type: Type
+          effective_date: Effective Date
+          supersedes: Supersedes
+          status: Status
+
+        facets:
+          - regulation_type
+          - status
+
+      housing_schemes:
+        title: Housing Schemes
+        description: Private housing scheme approvals
+        label_column: scheme_name
+        sort_desc: approval_date
+
+        columns:
+          id: Record ID
+          document_id: Document
+          scheme_name: Scheme Name
+          location: Location
+          developer: Developer
+          approval_status: Status
+          approval_date: Approval Date
+          total_area: Total Area
+          plot_count: Number of Plots
+
+        facets:
+          - approval_status
+          - location
+
+      tenders:
+        title: Tenders
+        description: LDA tenders and procurement
+        label_column: tender_title
+        sort_desc: issue_date
+
+        columns:
+          id: Record ID
+          document_id: Document
+          tender_number: Tender Number
+          tender_title: Title
+          tender_type: Type
+          issue_date: Issue Date
+          closing_date: Closing Date
+          opening_date: Opening Date
+          estimated_cost: Estimated Cost
+          status: Status
+
+        facets:
+          - tender_type
+          - status
+
+# Custom SQL queries for common searches
+queries:
+  documents_by_topic:
+    title: Documents by Advocacy Topic
+    sql: |
+      SELECT
+        d.id,
+        d.title,
+        d.document_type,
+        d.date_published,
+        t.name as topic,
+        dt.confidence,
+        d.url
+      FROM documents d
+      JOIN document_tags dt ON d.id = dt.document_id
+      JOIN tags t ON dt.tag_id = t.id
+      WHERE t.name = :topic
+      ORDER BY dt.confidence DESC, d.date_published DESC
+
+  recent_documents:
+    title: Recently Added Documents
+    sql: |
+      SELECT
+        id,
+        title,
+        document_type,
+        date_published,
+        page_count,
+        url
+      FROM documents
+      ORDER BY date_scraped DESC
+      LIMIT 50
+
+  search_full_text:
+    title: Full-Text Search
+    sql: |
+      SELECT
+        d.id,
+        d.title,
+        d.document_type,
+        d.date_published,
+        snippet(documents_fts, 1, '<mark>', '</mark>', '...', 50) as snippet,
+        d.url
+      FROM documents_fts
+      JOIN documents d ON documents_fts.rowid = d.id
+      WHERE documents_fts MATCH :search_query
+      ORDER BY rank
+      LIMIT 100
+
+  walkability_documents:
+    title: Walkability & Pedestrian Documents
+    sql: |
+      SELECT
+        d.id,
+        d.title,
+        d.document_type,
+        d.date_published,
+        GROUP_CONCAT(t.name, ', ') as topics,
+        d.url
+      FROM documents d
+      JOIN document_tags dt ON d.id = dt.document_id
+      JOIN tags t ON dt.tag_id = t.id
+      WHERE t.name IN ('walkability', 'parking', 'density')
+      GROUP BY d.id
+      ORDER BY d.date_published DESC
+
+  public_transport_documents:
+    title: Public Transport Documents
+    sql: |
+      SELECT
+        d.id,
+        d.title,
+        d.document_type,
+        d.date_published,
+        d.url
+      FROM documents d
+      JOIN document_tags dt ON d.id = dt.document_id
+      JOIN tags t ON dt.tag_id = t.id
+      WHERE t.name = 'public_transport'
+      ORDER BY d.date_published DESC
+
+  meeting_timeline:
+    title: Meeting Minutes Timeline
+    sql: |
+      SELECT
+        mm.meeting_date,
+        d.title,
+        mm.meeting_type,
+        GROUP_CONCAT(DISTINCT t.name, ', ') as topics,
+        d.url
+      FROM meeting_minutes mm
+      JOIN documents d ON mm.document_id = d.id
+      LEFT JOIN document_tags dt ON d.id = dt.document_id
+      LEFT JOIN tags t ON dt.tag_id = t.id
+      WHERE mm.meeting_date IS NOT NULL
+      GROUP BY mm.id
+      ORDER BY mm.meeting_date DESC
+
+plugins:
+  datasette-cluster-map:
+    latitude_column: latitude
+    longitude_column: longitude

@@ -1,0 +1,125 @@
+# LDA Transparency Database Configuration
+
+# Base URL for LDA website
+base_url: "https://lda.gop.pk"
+
+# Data directories
+data_dir: "data/pdfs"
+cache_dir: "data/cache"
+database_path: "lda_transparency.db"
+
+# Scraper settings
+scraper:
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+  timeout: 30
+  max_retries: 3
+  delay_between_requests: 1.0
+
+# OCR settings
+ocr:
+  language: "eng+urd"  # English and Urdu
+  dpi: 300
+  tesseract_config: "--psm 6 --oem 3"
+
+# Advocacy topic keywords for auto-tagging
+advocacy_topics:
+  walkability:
+    - "pedestrian"
+    - "footpath"
+    - "sidewalk"
+    - "walking"
+    - "walkway"
+    - "pavement"
+    - "crosswalk"
+    - "zebra crossing"
+
+  congestion:
+    - "traffic jam"
+    - "congestion"
+    - "traffic flow"
+    - "traffic management"
+    - "bottleneck"
+    - "vehicle density"
+
+  public_transport:
+    - "bus"
+    - "metro"
+    - "public transport"
+    - "mass transit"
+    - "bus rapid transit"
+    - "brt"
+    - "orange line"
+    - "green line"
+    - "rapid transit"
+
+  parking:
+    - "parking"
+    - "car park"
+    - "parking lot"
+    - "parking space"
+    - "parking requirement"
+    - "parking provision"
+
+  density:
+    - "density"
+    - "floor area ratio"
+    - "far"
+    - "plot coverage"
+    - "building height"
+    - "mixed use"
+    - "zoning"
+    - "land use"
+
+  sustainability:
+    - "green space"
+    - "park"
+    - "open space"
+    - "environment"
+    - "sustainable"
+    - "climate"
+    - "tree"
+    - "plantation"
+
+  housing:
+    - "affordable housing"
+    - "residential"
+    - "housing scheme"
+    - "plot"
+    - "allotment"
+
+  urban_planning:
+    - "master plan"
+    - "urban design"
+    - "development plan"
+    - "spatial planning"
+    - "city planning"
+    - "urbanization"
+
+# Document types and their URLs (to be populated during reconnaissance)
+document_sources:
+  regulations:
+    url: "/regulations"
+    enabled: true
+
+  meeting_minutes:
+    url: "/meetings"
+    enabled: true
+
+  land_use:
+    url: "/land-use"
+    enabled: true
+
+  housing_schemes:
+    url: "/housing-schemes"
+    enabled: true
+
+  tenders:
+    url: "/tenders"
+    enabled: true
+
+# Datasette configuration
+datasette:
+  title: "LDA Transparency Database"
+  description: "Tracking Lahore Development Authority planning meetings, decisions, and documents"
+  license: "CC0-1.0"
+  source: "Lahore Development Authority (lda.gop.pk)"
