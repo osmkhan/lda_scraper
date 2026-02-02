@@ -1,11 +1,12 @@
 """
-Tesseract OCR processor for scanned PDFs.
-Converts PDF pages to images and extracts text using Tesseract.
+EasyOCR processor for scanned PDFs.
+Converts PDF pages to images and extracts text using EasyOCR (no system dependencies!).
 """
 
-import pytesseract
+import easyocr
 from pdf2image import convert_from_path
 from PIL import Image
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
@@ -17,33 +18,39 @@ logger = logging.getLogger(__name__)
 
 
 class OCRProcessor:
-    """Process scanned PDFs using Tesseract OCR."""
+    """Process scanned PDFs using EasyOCR (no Tesseract needed!)."""
 
     def __init__(
         self,
         pdf_path: str,
-        languages: str = "eng+urd",
+        languages: List[str] = None,
         dpi: int = 300,
-        tesseract_config: str = "--psm 6 --oem 3"
+        gpu: bool = False
     ):
         """
-        Initialize OCR processor.
+        Initialize OCR processor with EasyOCR.
 
         Args:
             pdf_path: Path to PDF file
-            languages: Tesseract language codes (e.g., 'eng', 'eng+urd')
+            languages: List of language codes (default: ['en', 'ur'] for English + Urdu)
             dpi: DPI for PDF to image conversion (higher = better quality but slower)
-            tesseract_config: Tesseract configuration string
-                --psm 6: Assume a single uniform block of text
-                --oem 3: Default OCR Engine Mode
+            gpu: Use GPU acceleration if available (default: False for compatibility)
         """
         self.pdf_path = Path(pdf_path)
         if not self.pdf_path.exists():
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
+        # Default to English and Urdu
+        if languages is None:
+            languages = ['en', 'ur']
+
         self.languages = languages
         self.dpi = dpi
-        self.tesseract_config = tesseract_config
+        self.gpu = gpu
+
+        # Initialize EasyOCR reader (downloads models on first use)
+        logger.info(f"Initializing EasyOCR reader with languages: {languages}")
+        self.reader = easyocr.Reader(languages, gpu=gpu)
 
     def pdf_to_images(self, page_range: Optional[Tuple[int, int]] = None) -> List[Image.Image]:
         """
@@ -78,7 +85,7 @@ class OCRProcessor:
 
     def ocr_image(self, image: Image.Image, page_num: int) -> Tuple[int, str, Dict]:
         """
-        Perform OCR on a single image.
+        Perform OCR on a single image using EasyOCR.
 
         Args:
             image: PIL Image object
@@ -88,31 +95,31 @@ class OCRProcessor:
             Tuple of (page_num, text, ocr_data)
         """
         try:
-            # Get OCR data with confidence scores
-            ocr_data = pytesseract.image_to_data(
-                image,
-                lang=self.languages,
-                config=self.tesseract_config,
-                output_type=pytesseract.Output.DICT
-            )
+            # Convert PIL Image to numpy array
+            image_array = np.array(image)
 
-            # Extract text
-            text = pytesseract.image_to_string(
-                image,
-                lang=self.languages,
-                config=self.tesseract_config
-            )
+            # Perform OCR
+            results = self.reader.readtext(image_array)
+
+            # Extract text and confidence scores
+            text_lines = []
+            confidences = []
+
+            for detection in results:
+                # Each detection is: (bbox, text, confidence)
+                _, text, confidence = detection
+                text_lines.append(text)
+                confidences.append(confidence * 100)  # Convert to percentage
+
+            # Combine all text
+            full_text = '\n'.join(text_lines)
 
             # Calculate average confidence
-            confidences = [
-                int(conf) for conf in ocr_data['conf']
-                if conf != '-1' and str(conf).isdigit()
-            ]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0
 
-            return page_num, text.strip(), {
+            return page_num, full_text.strip(), {
                 'confidence': avg_confidence,
-                'word_count': len([w for w in ocr_data['text'] if w.strip()])
+                'word_count': len(text_lines)
             }
 
         except Exception as e:
@@ -121,14 +128,14 @@ class OCRProcessor:
 
     def process_pdf(
         self,
-        max_workers: int = 4,
+        max_workers: int = 2,
         page_range: Optional[Tuple[int, int]] = None
     ) -> Dict[int, Dict]:
         """
         Process entire PDF with OCR.
 
         Args:
-            max_workers: Number of parallel workers for OCR processing
+            max_workers: Number of parallel workers (default: 2, EasyOCR is heavy)
             page_range: Optional tuple of (first_page, last_page) to process
 
         Returns:
@@ -144,9 +151,9 @@ class OCRProcessor:
         # Calculate starting page number
         start_page = page_range[0] if page_range else 1
 
-        # Process pages in parallel
+        # Process pages in parallel (but fewer workers than Tesseract since EasyOCR is heavier)
         results = {}
-        logger.info(f"Processing {len(images)} pages with OCR...")
+        logger.info(f"Processing {len(images)} pages with EasyOCR...")
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
@@ -195,16 +202,16 @@ class OCRProcessor:
 
 def process_scanned_pdf(
     pdf_path: str,
-    languages: str = "eng+urd",
+    languages: List[str] = None,
     dpi: int = 300,
-    max_workers: int = 4
+    max_workers: int = 2
 ) -> Dict[int, str]:
     """
     Convenience function to process a scanned PDF with OCR.
 
     Args:
         pdf_path: Path to PDF file
-        languages: Tesseract language codes
+        languages: List of language codes (default: ['en', 'ur'])
         dpi: DPI for image conversion
         max_workers: Number of parallel workers
 
@@ -218,25 +225,26 @@ def process_scanned_pdf(
     return {page_num: data['text'] for page_num, data in results.items()}
 
 
-def check_tesseract_installation() -> bool:
-    """Check if Tesseract is properly installed."""
+def check_easyocr_installation() -> bool:
+    """Check if EasyOCR is properly installed."""
     try:
-        version = pytesseract.get_tesseract_version()
-        logger.info(f"Tesseract version: {version}")
+        # Try to import and create a simple reader
+        import easyocr
+        logger.info("EasyOCR is installed")
+        logger.info("Note: Language models will be downloaded on first use")
         return True
     except Exception as e:
-        logger.error(f"Tesseract not found: {e}")
-        logger.error("Please install Tesseract OCR:")
-        logger.error("  Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-urd")
-        logger.error("  macOS: brew install tesseract tesseract-lang")
+        logger.error(f"EasyOCR not found: {e}")
+        logger.error("Please install EasyOCR:")
+        logger.error("  pip install easyocr")
         return False
 
 
 if __name__ == "__main__":
     import sys
 
-    # Check Tesseract installation
-    if not check_tesseract_installation():
+    # Check EasyOCR installation
+    if not check_easyocr_installation():
         sys.exit(1)
 
     if len(sys.argv) < 2:

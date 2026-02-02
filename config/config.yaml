@@ -15,11 +15,11 @@ scraper:
   max_retries: 3
   delay_between_requests: 1.0
 
-# OCR settings
+# OCR settings (EasyOCR - no system dependencies!)
 ocr:
-  language: "eng+urd"  # English and Urdu
-  dpi: 300
-  tesseract_config: "--psm 6 --oem 3"
+  languages: ["en", "ur"]  # English and Urdu language codes
+  dpi: 300                  # Image resolution for PDF conversion
+  gpu: false                # Use GPU acceleration (requires CUDA)
 
 # Advocacy topic keywords for auto-tagging
 advocacy_topics:

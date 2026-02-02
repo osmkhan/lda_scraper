@@ -12,7 +12,7 @@ from pathlib import Path
 
 from database.schema import LDADatabase, create_database
 from scrapers.lda_scraper import LDAScraper
-from ocr.ocr_processor import check_tesseract_installation
+from ocr.ocr_processor import check_easyocr_installation
 import logging
 
 logging.basicConfig(
@@ -47,14 +47,14 @@ def check_setup(args):
     else:
         logger.info(f"✓ Database found at {db_path}")
 
-    # Check Tesseract
-    if not check_tesseract_installation():
-        issues.append("Tesseract OCR not installed")
-        logger.warning("❌ Tesseract not found. Install with:")
-        logger.warning("   Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-urd")
-        logger.warning("   macOS: brew install tesseract tesseract-lang")
+    # Check EasyOCR
+    if not check_easyocr_installation():
+        issues.append("EasyOCR not installed")
+        logger.warning("❌ EasyOCR not found. Install with:")
+        logger.warning("   pip install easyocr")
+        logger.warning("   (Language models will download automatically on first use)")
     else:
-        logger.info("✓ Tesseract OCR is installed")
+        logger.info("✓ EasyOCR is installed")
 
     # Check config
     if not Path("config/config.yaml").exists():

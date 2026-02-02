@@ -19,12 +19,13 @@ class DocumentProcessor:
     def __init__(
         self,
         pdf_path: str,
-        ocr_languages: str = "eng+urd",
+        ocr_languages: list = None,
         ocr_dpi: int = 300,
-        max_workers: int = 4
+        max_workers: int = 2
     ):
         self.pdf_path = Path(pdf_path)
-        self.ocr_languages = ocr_languages
+        # Default to English and Urdu
+        self.ocr_languages = ocr_languages if ocr_languages else ['en', 'ur']
         self.ocr_dpi = ocr_dpi
         self.max_workers = max_workers
 
@@ -51,7 +52,7 @@ class DocumentProcessor:
             is_scanned = True
 
         if is_scanned or force_ocr:
-            logger.info("PDF is scanned or OCR forced - using Tesseract OCR")
+            logger.info("PDF is scanned or OCR forced - using EasyOCR")
             metadata['extraction_method'] = 'ocr'
             metadata['is_scanned'] = True
 
@@ -94,9 +95,9 @@ class DocumentProcessor:
 def process_document(
     pdf_path: str,
     force_ocr: bool = False,
-    ocr_languages: str = "eng+urd",
+    ocr_languages: list = None,
     ocr_dpi: int = 300,
-    max_workers: int = 4
+    max_workers: int = 2
 ) -> Tuple[Dict[int, str], Dict]:
     """
     Convenience function to process any PDF document.
@@ -104,7 +105,7 @@ def process_document(
     Args:
         pdf_path: Path to PDF file
         force_ocr: Force OCR even if PDF is searchable
-        ocr_languages: Tesseract language codes
+        ocr_languages: EasyOCR language codes (default: ['en', 'ur'])
         ocr_dpi: DPI for OCR image conversion
         max_workers: Number of parallel workers for OCR
 
